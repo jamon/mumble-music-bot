@@ -1,0 +1,20 @@
+{
+  "name": "mumble-musicbot",
+  "version": "0.0.0",
+  "description": "Mumble MusicBot with PlayMusic support",
+  "main": "bot.js",
+  "dependencies": {
+    "avconv": "~3.0.1",
+    "combined-stream": "~1.0.1",
+    "google-speech-api": "~1.1.1",
+    "lame": "~1.2.2",
+    "mumble": "~0.0.8",
+    "playmusic": "~1.1.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT"
+}
