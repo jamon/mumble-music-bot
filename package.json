@@ -9,7 +9,7 @@
     "google-speech-api": "~1.1.1",
     "lame": "~1.2.2",
     "mumble": "~0.0.8",
-    "playmusic": "~1.1.1"
+    "playmusic": "jamon/playmusic"
   },
   "devDependencies": {},
   "scripts": {
