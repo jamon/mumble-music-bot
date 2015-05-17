@@ -1,0 +1,3 @@
+*.pem
+config.json
+node_modules
