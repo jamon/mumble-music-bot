@@ -58,7 +58,24 @@ var getImage = function(imageUrl, callback) {
     req.end();
 };
 
+function shuffle(array) {
+  var currentIndex = array.length, temporaryValue, randomIndex ;
 
+  // While there remain elements to shuffle...
+  while (0 !== currentIndex) {
+
+    // Pick a remaining element...
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex -= 1;
+
+    // And swap it with the current element.
+    temporaryValue = array[currentIndex];
+    array[currentIndex] = array[randomIndex];
+    array[randomIndex] = temporaryValue;
+  }
+
+  return array;
+}
 var locked = false;
 var playStream, decoderStream, mumbleStream;
 var sessions = {};
@@ -66,7 +83,7 @@ var results = [];
 var volume = 0.06;
 var queue = [];
 var playing = false;
-var client = mumble.connect('mumble://a1ive.org', options, function(error, connection) {
+var client = mumble.connect(pmConfig.server, options, function(error, connection) {
     if(error) { throw new Error(error); }
 
 
@@ -200,11 +217,32 @@ var client = mumble.connect('mumble://a1ive.org', options, function(error, conne
                 respond("Tracks Found: <br>" + tracks.join("<br>"));
                 console.log(util.inspect(tracks, {depth: null, colors: true}));
             });
+        } else if(event.message.match(/^queuerm /)) {
+            var num = parseInt(event.message.substr(8));
+            var item = queue.splice(num, 1);
+            var q = item[0];
+            if(item) {
+                var message = "<div>removed " + q.track.artist + " - " + q.track.title + " (" + q.userName + ")</div>".replace("&", "&amp;", "g");
+                connection.user.channel.sendMessage(message);
+            }
+        } else if(event.message.match(/^queuetop /)) {
+            var num = parseInt(event.message.substr(8));
+            var item = queue.splice(num, 1);
+            var q = item[0];
+            queue.unshift(q);
+            if(item) {
+                var message = "<div>removed " + q.track.artist + " - " + q.track.title + " (" + q.userName + ")</div>".replace("&", "&amp;", "g");
+                connection.user.channel.sendMessage(message);
+            }
+        } else if(event.message.match(/^queuerand/)) {
+            shuffle(queue);
+            var message = "<div>randomized queue</div>";
+            connection.user.channel.sendMessage(message);
         } else if(event.message.match(/^queue/)) {
             var num = parseInt(event.message.substr(5));
 
-            var message = queue.map(function(q) {
-                return "<div>" + q.track.artist + " - " + q.track.title + " (" + q.userName + ")</div>".replace("&", "&amp;", "g");
+            var message = queue.map(function(q, i) {
+                return "<div>(" + i + ") " + q.track.artist + " - " + q.track.title + " (" + q.userName + ")</div>".replace("&", "&amp;", "g");
             });
             connection.user.channel.sendMessage(message.join("\n"));
 
