@@ -11,6 +11,7 @@ import lwip from 'lwip';
 import PlayMusic from 'playmusic';
 import arrayShuffle from 'array-shuffle';
 import async from 'async';
+import React from 'react';
 
 class MusicBot {
     constructor(playMusic) {
@@ -100,16 +101,36 @@ class MusicBot {
     }
 
 }
+
+const Track = React.createClass({
+    render() {
+        var imgSrc = "data:image/png;base64," + this.props.image;
+        return <div>
+            <img style={{float: "left"}} src={imgSrc} />
+            <div style={{float: "left", paddingLeft: 15}}>
+                <h3>{this.props.track.artist}</h3>
+                <p style={{marginTop: 5}}>{this.props.track.title}</p>
+                <p style={{fontStyle: "italic", margin: 0}}>(requested by {this.props.userName})</p>
+            </div>
+        </div>;
+    }
+});
 var mb = new MusicBot();
 mb.lwip("http://lh3.ggpht.com/glnJ4FZ4nE6Zphn5OysD1Tzfs8oWdGlsp34wCp5AGTYaplxgwiPxpD9SIKuzBbDrDgFuRqXbRg",
         [
-            {type: "contain", args: [75, 75, "white", "lanczos"]},
+            {type: "contain", args: [15, 15, "white", "lanczos"]},
             {type: "toBuffer", args: ["png", {}]}
         ],
 
         function(err, result) {
     if(err) return console.error(err);
-    console.log(result.toString("base64").length);
+    var image = result.toString("base64");
+    var track = {
+        artist: "Bastille",
+        title: "Thing we lost in the fire"
+    };
+    var message = React.renderToStaticMarkup(<Track image={image} track={track} userName="Jamon" />);
+    console.log(message);
 });
 
 // mb.getAndShrinkImage("http://lh3.ggpht.com/glnJ4FZ4nE6Zphn5OysD1Tzfs8oWdGlsp34wCp5AGTYaplxgwiPxpD9SIKuzBbDrDgFuRqXbRg", function(err, result) {
