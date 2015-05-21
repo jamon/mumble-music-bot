@@ -4,17 +4,25 @@
   "description": "Mumble MusicBot with PlayMusic support",
   "main": "bot.js",
   "dependencies": {
-    "avconv": "~3.0.1",
+    "array-shuffle": "^1.0.0",
+    "async": "^0.9.2",
+    "babel": "^5.4.3",
+    "bluebird": "^2.9.25",
     "combined-stream": "~1.0.1",
-    "google-speech-api": "~1.1.1",
     "lame": "~1.2.2",
-    "mumble": "~0.0.8",
-    "playmusic": "jamon/playmusic"
+    "lwip": "0.0.6",
+    "mumble": "git://github.com/rantanen/node-mumble.git",
+    "playmusic": "jamon/playmusic",
+    "react": "^0.13.3"
   },
   "devDependencies": {},
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node_modules/.bin/babel-node musicbot.js"
   },
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "jshintConfig": {
+    "esnext": true
+  }
 }
