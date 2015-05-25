@@ -1,4 +1,12 @@
 {
-    "email": "xxxxxx@gmail.com",
-    "password": ""
+    "playMusic": {
+        "email": "xxxxxx@gmail.com",
+        "password": "xxxxxxx"
+    },
+    "mumble": {
+        "server": "mumble://xxxxxxxxxxxx.xyz",
+        "key": "private.pem",
+        "cert": "public.pem",
+        "name": "MewsickBawt"
+    }
 }

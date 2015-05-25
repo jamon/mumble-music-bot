@@ -12,101 +12,101 @@ import PlayMusic from 'playmusic';
 import arrayShuffle from 'array-shuffle';
 import async from 'async';
 import React from 'react';
+import events from 'events';
 
-class MusicBot {
+class MusicPlayer extends events.EventEmitter {
     constructor(playMusic) {
         this.pm = playMusic;
+        this.queue = [];
+        this.volume = 0.05;
     }
-    connect(server, mumbleOptions, callback) {
-        return mumble.connectAsync(server, mumbleOptions).then(function(connection) {
-            this.connections.push(connection);
-            return connection;
-        }).nodeify(callback);
+    setVolume(volume) {
+        this.volume = Math.min(1, Math.max(0, volume));
+        this.emit("volume", this.volume);
     }
-    getAndShrinkImage(urlString, callback) {
-        async.waterfall([
-            function(callback) {
-                // retrieve via http/https
-                this.getUrl(urlString, callback);
-            }.bind(this), function(res, callback) {
-                // load in lwip
-                let imageTypes = {
-                    "image/png": "png",
-                    "image/jpeg": "jpg",
-                    "image/gif": "gif"
-                };
-                var imageType = imageTypes[res.headers['content-type']];
-                lwip.open(res.body, imageType, callback);
-            }, function(image, callback) {
-                // resize and contain to 75x75 white canvas
-                image.contain(75, 75, "white", "lanczos", callback);
-            }, function(image, callback) {
-                // to png
-                image.toBuffer("png", {}, callback);
-            }, function(buffer, callback) {
-                // to base64
-                callback(null, buffer.toString("base64"));
+    queue(trackIds, position, length, requestor, callback) {
+        async.map(trackIds,
+            (trackId, callback) => this.getTrack(trackId, (err, track) => callback(err, {track: track, requestor: requestor})),
+            (err, queueItems) => {
+                if(Number.isInteger(position) && position >= 0 && position < this.queue.length) {
+                    this.queue.splice.apply(this.queue, [position, Number.isInteger(position) ? position : 0].concat(queueItems));
+                } else {
+                    this.queue.push(queueItems);
+                }
+                callback(null, queueItem);
             }
-        ], callback);
+        );
     }
-    lwip(urlString, operations, callback) {
-        var ops = operations.map(function(op) {
-            return function(image, callback) {
-                var args = op.args;
-                op.args.push(callback);
-                image[op.type].apply(image, args);
-            };
-        });
-        ops.unshift(function(callback) {
-            this.getUrl(urlString, callback);
-        }.bind(this), function(res, callback) {
-            // load in lwip
-            let imageTypes = {
-                "image/png": "png",
-                "image/jpeg": "jpg",
-                "image/gif": "gif"
-            };
-            var imageType = imageTypes[res.headers['content-type']];
-            lwip.open(res.body, imageType, callback);
-        });
-        async.waterfall(ops, callback);
+    queuePush(trackId, requestor, callback) {
 
     }
-    getUrl(urlString, callback) {
-        let handlers = {"http:": http, "https:": https};
+    queueSplice(index, length) {
+        this.queue.splice(index, length);
+        if(index === 0) this.stop();
+    }
+}
+
+class MusicBot {
+    constructor(player) {
+        this.player = player;
+        this.clients = [];
+    }
+    connect(server, name, mumbleOptions, callback) {
+        return mumble.connect(server, mumbleOptions, (err, client) => {
+            if(err) return callback(err);
+            client.authenticate(name);
+            client.on('initialized', () => this.onInitialized(client, callback));
+            client.on('message', this.onMessage.bind(this));
+        });
+    }
+    onInitialized(client, callback) {
+        this.clients.push(client);
+        callback(client);
+    }
+    onMessage(message, user, scope) {
+        var command = message.split(" ", 1)[0];
+        console.log("command", command);
+    }
+    getLwipImageType(mimeType) {
         let imageTypes = {
             "image/png": "png",
             "image/jpeg": "jpg",
             "image/gif": "gif"
         };
+        return imageTypes[mimeType];
+    }
+    getAndShrinkImage(urlString, callback) {
+        async.waterfall([
+            callback => this.getUrl(urlString, callback),
+            (res, callback) => lwip.open(res.body, this.getLwipImageType(res.headers['content-type']), callback),
+            (image, callback) => image.contain(75, 75, "white", "lanczos", callback),
+            (image, callback) => image.toBuffer("png", {}, callback)
+        ], callback);
+    }
+    getUrl(urlString, callback) {
+        let handlers = {"http:": http, "https:": https};
+
         let parsedUrl = url.parse(urlString);
         let handler = handlers[parsedUrl.protocol];
-        if(!handler) throw new Error("No handler for protocol: " + parsedUrl.protocol);
+        if(!handler) callback(Error("No handler for protocol: " + parsedUrl.protocol));
 
         let bufs = [];
-        let req = http.request(parsedUrl, function(res) {
-            res.on('data', function(d) {
-                bufs.push(d);
-            });
-
+        let req = handler.request(parsedUrl, function(res) {
+            res.on('data', d => bufs.push(d));
             res.on('end', function() {
                 res.body = Buffer.concat(bufs);
                 callback(null, res);
             });
-            res.on('error', function(err) {
-                callback(err);
-            });
+            res.on('error', err => callback(err));
         });
         req.end();
     }
-
 }
 
-const Track = React.createClass({
+const QueuedTrack = React.createClass({
     render() {
-        var imgSrc = "data:image/png;base64," + this.props.image;
         return <div>
-            <img style={{float: "left"}} src={imgSrc} />
+            {typeof this.props.image !== "undefined" ? <img style={{float: "left"}} src={"data:image/png;base64," + imgSrc} /> : null}
             <div style={{float: "left", paddingLeft: 15}}>
                 <h3>{this.props.track.artist}</h3>
                 <p style={{marginTop: 5}}>{this.props.track.title}</p>
@@ -116,28 +116,39 @@ const Track = React.createClass({
     }
 });
 var mb = new MusicBot();
-mb.lwip("http://lh3.ggpht.com/glnJ4FZ4nE6Zphn5OysD1Tzfs8oWdGlsp34wCp5AGTYaplxgwiPxpD9SIKuzBbDrDgFuRqXbRg",
-        [
-            {type: "contain", args: [15, 15, "white", "lanczos"]},
-            {type: "toBuffer", args: ["png", {}]}
-        ],
-
-        function(err, result) {
+var log = function() {
+    var args = Array.prototype.slice.apply(arguments);
+    var fn = args.pop();
+    return function() {
+        util.log(args.join(" "), util.inspect(arguments));
+        fn.apply(this, arguments);
+    };
+};
+async.waterfall([
+    (callback) => fs.readFile("config.json", "utf8", callback),
+    (content, callback) => callback(null, JSON.parse(content)),
+    (config, callback) => async.map(
+        [config.mumble.key, config.mumble.cert],
+        (file, callback) => fs.readFile(file, 'utf8', callback),
+        (err, results) => callback(err, config, {key: results[0], cert: results[1]})
+    ),
+    (config, mumbleOptions, callback) => mb.connect(config.mumble.server, config.mumble.name, mumbleOptions, (err, client) => callback(err, config, client))
+].map((fn, i) => log("waterfall", i, fn)), function(err, config, client) {
+    if(err) console.error(err);
+    console.log(client);
+});
+/*
+mb.getAndShrinkImage("http://lh3.ggpht.com/glnJ4FZ4nE6Zphn5OysD1Tzfs8oWdGlsp34wCp5AGTYaplxgwiPxpD9SIKuzBbDrDgFuRqXbRg", function(err, result) {
     if(err) return console.error(err);
     var image = result.toString("base64");
     var track = {
         artist: "Bastille",
-        title: "Thing we lost in the fire"
+        title: "Things we lost in the fire"
     };
-    var message = React.renderToStaticMarkup(<Track image={image} track={track} userName="Jamon" />);
+    var message = React.renderToStaticMarkup(<QueuedTrack image={image} track={track} userName="Jamon" />);
     console.log(message);
 });
-
-// mb.getAndShrinkImage("http://lh3.ggpht.com/glnJ4FZ4nE6Zphn5OysD1Tzfs8oWdGlsp34wCp5AGTYaplxgwiPxpD9SIKuzBbDrDgFuRqXbRg", function(err, result) {
-//     if(err) return console.error(err);
-//     console.log(result.length);
-// });
-
+*/
 // pm.init(config, function(err) {
 //     if(err) console.error(err);
 // });
