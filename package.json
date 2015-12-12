@@ -10,7 +10,7 @@
     "bluebird": "^2.9.25",
     "combined-stream": "~1.0.1",
     "lame": "~1.2.2",
-    "lwip": "0.0.6",
+    "lwip": "0.0.8",
     "mumble": "git://github.com/rantanen/node-mumble.git",
     "playmusic": "jamon/playmusic",
     "react": "^0.13.3"

@@ -1,4 +1,4 @@
-/* jshint esnext: true */
+/* eslint-env node */
 import util from 'util';
 import fs from 'fs';
 import https from 'https';
@@ -6,16 +6,21 @@ import http from 'http';
 import url from 'url';
 
 import mumble from 'mumble';
-import lame from 'lame';
+//import lame from 'lame';
 import lwip from 'lwip';
-import PlayMusic from 'playmusic';
-import arrayShuffle from 'array-shuffle';
+//import PlayMusic from 'playmusic';
+//import arrayShuffle from 'array-shuffle';
 import async from 'async';
 import React from 'react';
 import events from 'events';
+import Promise from 'bluebird';
+
+Promise.promisifyAll(mumble);
+
 
 class MusicPlayer extends events.EventEmitter {
     constructor(playMusic) {
+        super();
         this.pm = playMusic;
         this.queue = [];
         this.volume = 0.05;
@@ -33,7 +38,7 @@ class MusicPlayer extends events.EventEmitter {
                 } else {
                     this.queue.push(queueItems);
                 }
-                callback(null, queueItem);
+                callback(null, queueItems);
             }
         );
     }
@@ -61,7 +66,7 @@ class MusicBot {
     }
     onInitialized(client, callback) {
         this.clients.push(client);
-        callback(client);
+        callback(null, client);
     }
     onMessage(message, user, scope) {
         var command = message.split(" ", 1)[0];
@@ -103,6 +108,76 @@ class MusicBot {
     }
 }
 
+class Param {
+    constructor() {
+        this.type = "unknown";
+    }
+    parse(val) {
+        if(!this.validates(val)) return new Error("Value must be ")
+        return val;
+    }
+    greaterThan(val) {
+        this.validations.push()
+    }
+    lessThan(val) {
+
+    }
+    greaterThanEqualTo(val) {
+
+    }
+    lessThanEqualTo(val) {
+
+    }
+    equalTo(val) {
+
+    }
+    in(vals) {
+
+    }
+    notIn(vals) {
+
+    }
+}
+class ParamString extends Param {
+    constructor() {
+        this.type = "string";
+    }
+}
+class ParamInt extends Param {
+    constructor() {
+        this.type = "int"
+    }
+    parse(val) {
+        var result = parseInt(val, 10);
+    }
+}
+class Command {
+    constructor(handler, args) {
+        this._handler = handler;
+        this.args = args;
+        this.handler = this.handle.bind(this);
+    }
+    static create(handler, args) {
+        var command = new Command(handler, args);
+        return command.handler;
+    }
+    static int() {
+        return new ParamInt();
+    }
+    static string() {
+        return new ParamString();
+    }
+    static float() {
+        return new ParamFloat();
+    }
+}
+class MusicBotCommands {
+    constructor() {
+        this.commands = {
+            "stop": Command.create(this.stop)
+        };
+    }
+}
 const QueuedTrack = React.createClass({
     render() {
         return <div>
@@ -134,8 +209,8 @@ async.waterfall([
     ),
     (config, mumbleOptions, callback) => mb.connect(config.mumble.server, config.mumble.name, mumbleOptions, (err, client) => callback(err, config, client))
 ].map((fn, i) => log("waterfall", i, fn)), function(err, config, client) {
-    if(err) console.error(err);
-    console.log(client);
+    if(err) console.error("error", typeof err);
+    console.log("connected.");
 });
 /*
 mb.getAndShrinkImage("http://lh3.ggpht.com/glnJ4FZ4nE6Zphn5OysD1Tzfs8oWdGlsp34wCp5AGTYaplxgwiPxpD9SIKuzBbDrDgFuRqXbRg", function(err, result) {
