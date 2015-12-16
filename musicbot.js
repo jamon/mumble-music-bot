@@ -17,7 +17,6 @@ import Promise from 'bluebird';
 
 Promise.promisifyAll(mumble);
 
-
 class MusicPlayer extends events.EventEmitter {
     constructor(playMusic) {
         super();
@@ -108,49 +107,6 @@ class MusicBot {
     }
 }
 
-class Param {
-    constructor() {
-        this.type = "unknown";
-    }
-    parse(val) {
-        if(!this.validates(val)) return new Error("Value must be ")
-        return val;
-    }
-    greaterThan(val) {
-        this.validations.push()
-    }
-    lessThan(val) {
-
-    }
-    greaterThanEqualTo(val) {
-
-    }
-    lessThanEqualTo(val) {
-
-    }
-    equalTo(val) {
-
-    }
-    in(vals) {
-
-    }
-    notIn(vals) {
-
-    }
-}
-class ParamString extends Param {
-    constructor() {
-        this.type = "string";
-    }
-}
-class ParamInt extends Param {
-    constructor() {
-        this.type = "int"
-    }
-    parse(val) {
-        var result = parseInt(val, 10);
-    }
-}
 class Command {
     constructor(handler, args) {
         this._handler = handler;
@@ -169,13 +125,6 @@ class Command {
     }
     static float() {
         return new ParamFloat();
-    }
-}
-class MusicBotCommands {
-    constructor() {
-        this.commands = {
-            "stop": Command.create(this.stop)
-        };
     }
 }
 const QueuedTrack = React.createClass({
@@ -208,8 +157,8 @@ async.waterfall([
         (err, results) => callback(err, config, {key: results[0], cert: results[1]})
     ),
     (config, mumbleOptions, callback) => mb.connect(config.mumble.server, config.mumble.name, mumbleOptions, (err, client) => callback(err, config, client))
-].map((fn, i) => log("waterfall", i, fn)), function(err, config, client) {
-    if(err) console.error("error", typeof err);
+], function(err, config, client) {
+    if(err) console.error("error", err);
     console.log("connected.");
 });
 /*
