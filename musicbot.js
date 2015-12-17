@@ -13,9 +13,11 @@ import lwip from 'lwip';
 import async from 'async';
 import React from 'react';
 import events from 'events';
-import Promise from 'bluebird';
+//import Promise from 'bluebird';
 
-Promise.promisifyAll(mumble);
+import CommandParser from './src/commands.js'
+
+//Promise.promisifyAll(mumble);
 
 class MusicPlayer extends events.EventEmitter {
     constructor(playMusic) {
@@ -51,8 +53,9 @@ class MusicPlayer extends events.EventEmitter {
 }
 
 class MusicBot {
-    constructor(player) {
-        this.player = player;
+    constructor(config) {
+        this.player = config.player;
+        this.commandPrefix = config.commandPrefix;
         this.clients = [];
     }
     connect(server, name, mumbleOptions, callback) {
@@ -68,8 +71,23 @@ class MusicBot {
         callback(null, client);
     }
     onMessage(message, user, scope) {
-        var command = message.split(" ", 1)[0];
-        console.log("command", command);
+        if(message.charAt(0) !== "!") return;
+        let command;
+        try {
+            command = CommandParser.parse(message);
+            console.log("command: ", command);
+        } catch (e) {
+            user.sendMessage(this.render(<ErrorParsingCommand error={e} />)); 
+        }
+
+    }
+    render(element) {
+        try {
+            return React.renderToStaticMarkup(element);
+        } catch (e) {
+            console.log("error rendering component", e);
+            return ""
+        }
     }
     getLwipImageType(mimeType) {
         let imageTypes = {
@@ -107,26 +125,14 @@ class MusicBot {
     }
 }
 
-class Command {
-    constructor(handler, args) {
-        this._handler = handler;
-        this.args = args;
-        this.handler = this.handle.bind(this);
+const ErrorParsingCommand = React.createClass({
+    render() {
+        return <div>
+            <span style={{fontWeight: "bold", color: "#d00000", marginRight: "1em"}}>Error parsing command:</span>
+            <span>{this.props.error && this.props.error.toString()}</span>
+        </div>;
     }
-    static create(handler, args) {
-        var command = new Command(handler, args);
-        return command.handler;
-    }
-    static int() {
-        return new ParamInt();
-    }
-    static string() {
-        return new ParamString();
-    }
-    static float() {
-        return new ParamFloat();
-    }
-}
+});
 const QueuedTrack = React.createClass({
     render() {
         return <div>
@@ -139,7 +145,7 @@ const QueuedTrack = React.createClass({
         </div>;
     }
 });
-var mb = new MusicBot();
+var mb = new MusicBot({commandPrefix: "!"});
 var log = function() {
     var args = Array.prototype.slice.apply(arguments);
     var fn = args.pop();
@@ -148,19 +154,32 @@ var log = function() {
         fn.apply(this, arguments);
     };
 };
-async.waterfall([
-    (callback) => fs.readFile("config.json", "utf8", callback),
-    (content, callback) => callback(null, JSON.parse(content)),
-    (config, callback) => async.map(
-        [config.mumble.key, config.mumble.cert],
-        (file, callback) => fs.readFile(file, 'utf8', callback),
-        (err, results) => callback(err, config, {key: results[0], cert: results[1]})
-    ),
-    (config, mumbleOptions, callback) => mb.connect(config.mumble.server, config.mumble.name, mumbleOptions, (err, client) => callback(err, config, client))
-], function(err, config, client) {
-    if(err) console.error("error", err);
-    console.log("connected.");
-});
+async.waterfall(
+    [
+        // read config.json
+        callback => fs.readFile("config.json", "utf8", callback),
+        // parse config
+        (content, callback) => callback(null, JSON.parse(content)),
+        // read key and cert from files
+        (config, callback) => 
+            async.map(
+                [config.mumble.key, config.mumble.cert],
+                (file, callback) => fs.readFile(file, 'utf8', callback),
+                (err, results) => callback(err, config, /* key */ results[0], /* cert */ results[1])
+            ),
+        // connect to mumble server
+        (config, key, cert, callback) => 
+            mb.connect(
+                config.mumble.server,
+                config.mumble.name,
+                {key: key, cert: cert},
+                (err, client) => callback(err, config, client)
+            )
+    ], (err, config, client) => {
+        if(err) console.error("error", err);
+        console.log("connected.");
+    }
+);
 /*
 mb.getAndShrinkImage("http://lh3.ggpht.com/glnJ4FZ4nE6Zphn5OysD1Tzfs8oWdGlsp34wCp5AGTYaplxgwiPxpD9SIKuzBbDrDgFuRqXbRg", function(err, result) {
     if(err) return console.error(err);
