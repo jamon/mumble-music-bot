@@ -8,49 +8,11 @@ import url from 'url';
 import mumble from 'mumble';
 //import lame from 'lame';
 import lwip from 'lwip';
-//import PlayMusic from 'playmusic';
 //import arrayShuffle from 'array-shuffle';
 import async from 'async';
 import React from 'react';
-import events from 'events';
-//import Promise from 'bluebird';
 
-import CommandParser from './src/commands.js'
-
-//Promise.promisifyAll(mumble);
-
-class MusicPlayer extends events.EventEmitter {
-    constructor(playMusic) {
-        super();
-        this.pm = playMusic;
-        this.queue = [];
-        this.volume = 0.05;
-    }
-    setVolume(volume) {
-        this.volume = Math.min(1, Math.max(0, volume));
-        this.emit("volume", this.volume);
-    }
-    queue(trackIds, position, length, requestor, callback) {
-        async.map(trackIds,
-            (trackId, callback) => this.getTrack(trackId, (err, track) => callback(err, {track: track, requestor: requestor})),
-            (err, queueItems) => {
-                if(Number.isInteger(position) && position >= 0 && position < this.queue.length) {
-                    this.queue.splice.apply(this.queue, [position, Number.isInteger(position) ? position : 0].concat(queueItems));
-                } else {
-                    this.queue.push(queueItems);
-                }
-                callback(null, queueItems);
-            }
-        );
-    }
-    queuePush(trackId, requestor, callback) {
-
-    }
-    queueSplice(index, length) {
-        this.queue.splice(index, length);
-        if(index === 0) this.stop();
-    }
-}
+import CommandParser from './src/commands.js';
 
 class MusicBot {
     constructor(config) {
@@ -145,41 +107,8 @@ const QueuedTrack = React.createClass({
         </div>;
     }
 });
-var mb = new MusicBot({commandPrefix: "!"});
-var log = function() {
-    var args = Array.prototype.slice.apply(arguments);
-    var fn = args.pop();
-    return function() {
-        util.log(args.join(" "), util.inspect(arguments));
-        fn.apply(this, arguments);
-    };
-};
-async.waterfall(
-    [
-        // read config.json
-        callback => fs.readFile("config.json", "utf8", callback),
-        // parse config
-        (content, callback) => callback(null, JSON.parse(content)),
-        // read key and cert from files
-        (config, callback) => 
-            async.map(
-                [config.mumble.key, config.mumble.cert],
-                (file, callback) => fs.readFile(file, 'utf8', callback),
-                (err, results) => callback(err, config, /* key */ results[0], /* cert */ results[1])
-            ),
-        // connect to mumble server
-        (config, key, cert, callback) => 
-            mb.connect(
-                config.mumble.server,
-                config.mumble.name,
-                {key: key, cert: cert},
-                (err, client) => callback(err, config, client)
-            )
-    ], (err, config, client) => {
-        if(err) console.error("error", err);
-        console.log("connected.");
-    }
-);
+
+module.exports = MusicBot;
 /*
 mb.getAndShrinkImage("http://lh3.ggpht.com/glnJ4FZ4nE6Zphn5OysD1Tzfs8oWdGlsp34wCp5AGTYaplxgwiPxpD9SIKuzBbDrDgFuRqXbRg", function(err, result) {
     if(err) return console.error(err);

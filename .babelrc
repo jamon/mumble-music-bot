@@ -1,4 +1,4 @@
 {
-    "presets": ["stage-0"],
-    "plugins": ["transform-react-jsx", "transform-es2015-modules-umd"]
+    "presets": ["stage-0", "es2015"],
+    "plugins": ["transform-react-jsx"]
 }
