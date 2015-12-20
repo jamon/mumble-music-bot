@@ -79,7 +79,7 @@ class MusicBot {
             res.on('data', d => bufs.push(d));
             res.on('end', function() {
                 res.body = Buffer.concat(bufs);
-                callback(null, res);
+                if(typeof callback === "function") callback(null, res);
             });
             res.on('error', err => callback(err));
         });
