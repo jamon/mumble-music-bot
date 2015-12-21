@@ -33,7 +33,7 @@ class MusicBot {
         callback(null, client);
     }
     onMessage(message, user, scope) {
-        if(message.charAt(0) !== "!") return;
+        if(message.charAt(0) !== this.config.commandPrefix) return;
         let command;
         try {
             command = CommandParser.parse(message);
