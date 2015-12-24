@@ -11,26 +11,41 @@ import lwip from 'lwip';
 //import arrayShuffle from 'array-shuffle';
 import async from 'async';
 import React from 'react';
+import p from './promiseMaker';
 
+var PlayMusic = require('playmusic');
 import CommandParser from './src/commands.js';
 
 class MusicBot {
     constructor(config) {
-        this.player = config.player;
-        this.commandPrefix = config.commandPrefix;
-        this.clients = [];
+        this.config = config;
     }
-    connect(server, name, mumbleOptions, callback) {
-        return mumble.connect(server, mumbleOptions, (err, client) => {
-            if(err) return callback(err);
-            client.authenticate(name);
-            client.on('initialized', () => this.onInitialized(client, callback));
-            client.on('message', this.onMessage.bind(this));
-        });
+    async connect() {
+        console.log("attempting to read certificate (%s) and key (%s) from disk.", this.config.mumble.key, this.config.mumble.cert);
+        let key, cert;
+        try {
+            [key, cert] = await this.readFiles([this.config.mumble.key, this.config.mumble.cert]);
+        } catch (e) {
+            console.log("No key/cert specified in config.");
+        }
+        let mumbleOptions = Object.assign({}, {key: key, cert: cert}, this.config.mumble.options);
+        console.log("connecting to mumble with options", util.inspect(mumbleOptions, {colors: true}));
+
+        this.client = await p(cb => mumble.connect(this.config.mumble.server, mumbleOptions, cb));
+        console.log("connected to mumble");
+        this.client.authenticate(this.config.mumble.name);
+        //this.client.on('initialized', () => this.onInitialized(this.client, callback));
+        this.client.on('message', this.onMessage.bind(this));
+
+        this.play = new PlayMusic();
+        await p(cb => this.play.init(this.config.playMusic, cb));
+        console.log("connected to play music");
+
     }
-    onInitialized(client, callback) {
-        this.clients.push(client);
-        callback(null, client);
+    readFiles(fileNames) {
+        return Promise.all(fileNames.map(fileName =>
+            p(cb => fs.readFile(fileName, "utf8", cb))
+        ));
     }
     onMessage(message, user, scope) {
         if(message.charAt(0) !== this.config.commandPrefix) return;
@@ -38,10 +53,40 @@ class MusicBot {
         try {
             command = CommandParser.parse(message);
             console.log("command: ", command);
+            this.onCommand(message, user, scope, command);
         } catch (e) {
-            user.sendMessage(this.render(<ErrorParsingCommand error={e} />)); 
+            user.sendMessage(this.render(<Error error={e} />)); 
         }
 
+    }
+    async onCommand(message, user, scope, command) {
+        var handler = this[command.command];
+        if(typeof handler === "function") {
+            console.log("handling command", command);
+            try {
+                handler.apply(this, arguments);
+            } catch (e) {
+                user.sendMessage(this.render(<Error error={e} />));
+            }
+        } else {
+            console.log("no handler for command", command);
+            user.sendMessage(this.render(<Error error="no such command" />));
+        }
+    }
+    async search(message, user, scope, command) {
+        console.log("searching for: %s", command.term);
+        var results = await p(cb => this.play.search(command.term, 10, cb));
+        console.log("got results", results.entries.length);
+        //console.log(util.inspect(results, {colors: true, depth: 10}));
+        //var tracks = results.entries.filter(e => e.type === "2");
+        //console.log(util.inspect(tracks, {colors: true, depth: 10}));
+        let filter = {
+            "track": "1",
+            "artist": "2",
+            "album": "3",
+            "station": "6"
+        };
+        user.sendMessage(this.render(<EntryList filter={filter[command.type] || "1"} entries={results.entries} />));
     }
     render(element) {
         try {
@@ -87,11 +132,56 @@ class MusicBot {
     }
 }
 
-const ErrorParsingCommand = React.createClass({
+const Error = React.createClass({
     render() {
         return <div>
             <span style={{fontWeight: "bold", color: "#d00000", marginRight: "1em"}}>Error parsing command:</span>
             <span>{this.props.error && this.props.error.toString()}</span>
+        </div>;
+    }
+});
+const EntryList = React.createClass({
+    render() {
+        return <div>
+            {this.props.entries.map(entry => {
+                if(this.props.filter && this.props.filter !== entry.type) return;
+                switch(entry.type) {
+                    case "1":
+                        return <Track {...entry.track} />;
+                    case "2":
+                        return <Artist {...entry.artist} />;
+                    case "3":
+                        return <Album {...entry.album} />;
+                    default:
+                        console.log(entry);
+                        return <div>no handler for search response{JSON.stringify(entry)}</div>
+                }
+            })}
+        </div>;
+    }
+
+});
+const Track = React.createClass({
+    render() {
+        console.log("track - ", this.props);
+        return <div>
+            {this.props.artist} - {this.props.title}
+        </div>;
+    }
+});
+const Artist = React.createClass({
+    render() {
+        console.log("artist - ", this.props);
+        return <div>
+            {this.props.name}
+        </div>;
+    }
+});
+const Album = React.createClass({
+    render() {
+        console.log("album - ", this.props);
+        return <div>
+            [{this.props.year}] {this.props.artist} - {this.props.name}
         </div>;
     }
 });
