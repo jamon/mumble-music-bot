@@ -51,7 +51,7 @@ class MusicBot {
         if(message.charAt(0) !== this.config.commandPrefix) return;
         let command;
         try {
-            command = CommandParser.parse(message);
+            command = CommandParser.parse(message.substr(this.config.commandPrefix.length));
             console.log("command: ", command);
             this.onCommand(message, user, scope, command);
         } catch (e) {
@@ -64,7 +64,7 @@ class MusicBot {
         if(typeof handler === "function") {
             console.log("handling command", command);
             try {
-                handler.apply(this, arguments);
+                await handler.apply(this, arguments);
             } catch (e) {
                 user.sendMessage(this.render(<Error error={e} />));
             }
@@ -75,24 +75,47 @@ class MusicBot {
     }
     async search(message, user, scope, command) {
         console.log("searching for: %s", command.term);
-        var results = await p(cb => this.play.search(command.term, 10, cb));
+        let results = await p(cb => this.play.search(command.term, 20, cb));
         console.log("got results", results.entries.length);
-        //console.log(util.inspect(results, {colors: true, depth: 10}));
-        //var tracks = results.entries.filter(e => e.type === "2");
-        //console.log(util.inspect(tracks, {colors: true, depth: 10}));
-        let filter = {
-            "track": "1",
-            "artist": "2",
-            "album": "3",
-            "station": "6"
+        let searchTypes = {
+            "1": {type: "track", template: Track, limit: 8, typeLimit: 20, results: []}, // 1
+            "2": {type: "artist", template: Artist, limit: 4, typeLimit: 10, results: []}, // 2
+            "3": {type: "album", template: Album, limit: 4, typeLimit: 20, results: []}, // 3
+            "6": {type: "station", template: Station, limit: 4, typeLimit: 10, results: []} // 6
         };
-        user.sendMessage(this.render(<EntryList filter={filter[command.type] || "1"} entries={results.entries} />));
+        results.entries.forEach(entry => {
+            let st = searchTypes[entry.type];
+            if(
+                st && (
+                    (command.type === st.type && st.results.length < st.typeLimit) || (!command.type && st.results.length < st.limit)
+                )
+            ) {
+                st.results.push(entry);
+            }
+        });
+        this.client.user.channel.sendMessage(this.render(
+            <div>
+                <h3>Search: {user.name} => {command.type} => {command.term}</h3>
+                <ol>
+                    {Object.keys(searchTypes).map(st => searchTypes[st].results.length === 0 ? null :
+                        <div>
+                            <h4>{searchTypes[st].type}</h4>
+                            {searchTypes[st].results.map(entry => 
+                                <li>
+                                    <Entry {...entry}/>
+                                </li>
+                            )}
+                        </div>
+                    )}
+                </ol>
+            </div>
+        ));
     }
     render(element) {
         try {
             return React.renderToStaticMarkup(element);
         } catch (e) {
-            console.log("error rendering component", e);
+            console.log("error rendering component", e, e.stack);
             return ""
         }
     }
@@ -140,49 +163,59 @@ const Error = React.createClass({
         </div>;
     }
 });
-const EntryList = React.createClass({
+
+const Entry = React.createClass({
     render() {
-        return <div>
-            {this.props.entries.map(entry => {
-                if(this.props.filter && this.props.filter !== entry.type) return;
-                switch(entry.type) {
-                    case "1":
-                        return <Track {...entry.track} />;
-                    case "2":
-                        return <Artist {...entry.artist} />;
-                    case "3":
-                        return <Album {...entry.album} />;
-                    default:
-                        console.log(entry);
-                        return <div>no handler for search response{JSON.stringify(entry)}</div>
-                }
-            })}
-        </div>;
+        switch(this.props.type) {
+            case "1":
+                return <span><Track {...this.props} /></span>;
+            case "2":
+                return <span><Artist {...this.props} /></span>;
+            case "3":
+                return <span><Album {...this.props} /></span>;
+            case "6":
+                return <span><Station {...this.props} /></span>;
+            default:
+                console.log(this.props);
+                return <div>no handler for search response{JSON.stringify(entry)}</div>
+        }
     }
 
 });
 const Track = React.createClass({
     render() {
         console.log("track - ", this.props);
-        return <div>
-            {this.props.artist} - {this.props.title}
-        </div>;
+        let track = this.props.track;
+        return <span>
+            {track.artist} - {track.title}
+        </span>;
     }
 });
 const Artist = React.createClass({
     render() {
         console.log("artist - ", this.props);
-        return <div>
-            {this.props.name}
-        </div>;
+        let artist = this.props.artist;
+        return <span>
+            {artist.name}
+        </span>;
     }
 });
 const Album = React.createClass({
     render() {
         console.log("album - ", this.props);
-        return <div>
-            [{this.props.year}] {this.props.artist} - {this.props.name}
-        </div>;
+        let album = this.props.album;
+        return <span>
+            [{album.year}] {album.artist} - {album.name}
+        </span>;
+    }
+});
+const Station = React.createClass({
+    render() {
+        console.log("station - ", this.props);
+        let station = this.props.station;
+        return <span>
+            {station.name}
+        </span>;
     }
 });
 const QueuedTrack = React.createClass({
