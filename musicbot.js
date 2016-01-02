@@ -76,7 +76,7 @@ class MusicBot {
     async search(message, user, scope, command) {
         console.log("searching for: %s", command.term);
         let results = await p(cb => this.play.search(command.term, 20, cb));
-        console.log("got results", results.entries.length);
+
         let searchTypes = {
             "1": {type: "track", template: Track, limit: 8, typeLimit: 20, results: []}, // 1
             "2": {type: "artist", template: Artist, limit: 4, typeLimit: 10, results: []}, // 2
@@ -93,23 +93,7 @@ class MusicBot {
                 st.results.push(entry);
             }
         });
-        this.client.user.channel.sendMessage(this.render(
-            <div>
-                <h3>Search: {user.name} => {command.type} => {command.term}</h3>
-                <ol>
-                    {Object.keys(searchTypes).map(st => searchTypes[st].results.length === 0 ? null :
-                        <div>
-                            <h4>{searchTypes[st].type}</h4>
-                            {searchTypes[st].results.map(entry => 
-                                <li>
-                                    <Entry {...entry}/>
-                                </li>
-                            )}
-                        </div>
-                    )}
-                </ol>
-            </div>
-        ));
+        this.client.user.channel.sendMessage(this.render(<SearchResults searchTypes={searchTypes} user={user} command={command} />));
     }
     render(element) {
         try {
@@ -154,7 +138,27 @@ class MusicBot {
         req.end();
     }
 }
-
+const SearchResults = React.createClass({
+    render() {
+        return (
+            <div>
+                <h3>Search: {this.props.user.name} => {this.props.command.type} => {this.props.command.term}</h3>
+                <ol>
+                    {Object.keys(this.props.searchTypes).map(st => this.props.searchTypes[st].results.length === 0 ? null :
+                        <div>
+                            <h4>{this.props.searchTypes[st].type}</h4>
+                            {this.props.searchTypes[st].results.map(entry => 
+                                <li>
+                                    <Entry {...entry}/>
+                                </li>
+                            )}
+                        </div>
+                    )}
+                </ol>
+            </div>
+        );
+    }
+});
 const Error = React.createClass({
     render() {
         return <div>
@@ -180,7 +184,6 @@ const Entry = React.createClass({
                 return <div>no handler for search response{JSON.stringify(entry)}</div>
         }
     }
-
 });
 const Track = React.createClass({
     render() {
